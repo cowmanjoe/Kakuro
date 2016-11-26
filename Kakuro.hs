@@ -1,6 +1,7 @@
 module Kakuro where
 
 import Data.List
+import Data.Maybe
 
 -- Represents a square-shaped Kakuro puzzle 
 -- Size of rows and each element of rows must be size
@@ -15,7 +16,7 @@ data Puzzle = Puzzle {  size :: Int,
 -- the second of the tuple is the horizontal clue. If one of the tuples is 0, then there
 -- is no horizontal or vertical clue depending on which one is 0
 -- Entry Int is an entry into an empty space
-data Square = Blocked | Empty | Clue (Int, Int) | Entry Int deriving (Show)
+data Square = Blocked | Empty | Clue (Int, Int) | Entry Int deriving (Show, Eq)
 
 -- row p x returns row x of puzzle p
 row :: Puzzle -> Int -> [Square]
@@ -44,9 +45,41 @@ isWritable :: Square -> Bool
 isWritable s = isEntry s || isEmpty s
 
 -- entryVal returns the value of an entry, or 0 if it is empty
+entryVal :: Square -> Int
 entryVal (Entry x) = x
 entryVal Empty = 0
+entryVal _ = error("Invalid square for entryVal") 
 
+-- flattened r returns the flattened list of rows of r
+flattened :: [[Square]] -> [Square]
+flattened r = foldl (++) [] r
+
+-- unflattened r s the unflattened rows of r with s elements per row
+unflattened :: [Square] -> Int -> [[Square]]
+unflattened [] _ = []
+unflattened r s = (take s r):(unflattened (drop s r) s)
+
+-- squareAt p x y returns is the square at column x and row y in Puzzle p
+squareAt :: Puzzle -> (Int, Int) -> Square
+squareAt p (x,y) = ((rows p) !! y) !! x
+
+-- firstEmpty p returns the (x, y) coordinates of the first Empty square or Nothing if there is no Empty
+-- This searches by left to right, then up and down, so (2,1) would be found before (0,5)
+firstEmpty :: Puzzle -> Maybe (Int, Int)
+firstEmpty p 
+	| index == Nothing = Nothing
+	| otherwise = Just (fromJust index `mod` (size p), fromJust index `div` (size p))
+	where
+		index = elemIndex Empty (flattened (rows p))
+
+-- replaceAt i x lst returns lst with element at index i replaced with x
+replaceAt :: Int -> a -> [a] -> [a]
+replaceAt 0 e (x:xs) = e:xs
+replaceAt i e (x:xs) = x:replaceAt (i - 1) e xs
+
+--setSquare p s (x, y) returns the puzzle p with the square at x y set to s
+setSquare :: Puzzle -> Square -> (Int, Int) -> Puzzle 
+setSquare p s (x,y) = Puzzle (size p) (unflattened (replaceAt (y * (size p) + x) s (flattened (rows p))) (size p))
 
 -- rowSolved l is true if the given row is solved 
 rowSolved :: [Square] -> Bool
@@ -71,6 +104,20 @@ colSolved (Clue (c,_):xs) = notElem 0 entryValues && (sum entryValues == c) && n
 -- solved p returns true if p is a solved puzzle 
 solved :: Puzzle -> Bool
 solved p = (and [rowSolved r | r <- rows p]) && (and [colSolved c | c <- columns p])
+
+
+-- Returns Nothing if it is not solvable or returns Just p where p is the solved 
+-- version of the board
+{-
+solve :: Puzzle -> Maybe Puzzle
+solve p  
+	| solved p = Just p
+	| otherwise = solveAll (nextPuzzles p)
+-}
+
+-- nextPuzzles p returns a list of puzzles with the first Empty in p replaced by Entry 1 to 9
+nextPuzzles :: Puzzle -> [Puzzle]
+nextPuzzles p = map (\x -> (setSquare p (Entry x) (fromJust . firstEmpty $ p))) [1..9]
 
 
 
