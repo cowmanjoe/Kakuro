@@ -68,6 +68,21 @@ colSolved (Clue (c,_):xs) = notElem 0 entryValues && (sum entryValues == c) && n
 		noRepeats = ((length (nub entryValues)) == (length entryValues))
 		remainder = dropWhile isEntry xs 
 
-
+-- solved p returns true if p is a solved puzzle 
 solved :: Puzzle -> Bool
 solved p = (and [rowSolved r | r <- rows p]) && (and [colSolved c | c <- columns p])
+
+
+
+--TEST CASES--
+
+-- This sets p1 to a solved 6x6 puzzle: 
+-- let p1 = Puzzle 6 [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23), Entry 8, Entry 6, Entry 9, Clue (29, 0), Blocked], [Clue (0,27),Entry 9,Entry 3,Entry 7,Entry 8,Clue (8,0)],[Clue (0,4), Entry 3, Entry 1, Clue (9,8), Entry 7, Entry 1], [Blocked, Clue (0,23),Entry 2,Entry 8,Entry 9,Entry 4],[Blocked,Blocked,Clue (0,9),Entry 1,Entry 5, Entry 3]]
+
+-- This sets p2 to p1 except for the last entry is altered so it is incorrect 
+-- let p2 = Puzzle 6 [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23), Entry 8, Entry 6, Entry 9, Clue (29, 0), Blocked], [Clue (0,27),Entry 9,Entry 3,Entry 7,Entry 8,Clue (8,0)],[Clue (0,4), Entry 3, Entry 1, Clue (9,8), Entry 7, Entry 1], [Blocked, Clue (0,23),Entry 2,Entry 8,Entry 9,Entry 4],[Blocked,Blocked,Clue (0,9),Entry 1,Entry 5, Entry 2]]
+
+-- Now try: 
+-- column p1, 3
+-- solved p1
+-- solved p2
