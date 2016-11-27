@@ -3,12 +3,12 @@ module Kakuro where
 import Data.List
 import Data.Maybe
 
--- Represents a square-shaped Kakuro puzzle 
+-- Represents a size x size Kakuro puzzle 
 -- Size of rows and each element of rows must be size
 
 data Puzzle = Puzzle {  size :: Int,
 						rows :: [[Square]]  	
-					 }
+					 } deriving (Show,Eq)
 
 -- Blocked indicates this square does not need to be filled in
 -- Empty indicates this square is not filled in, and needs to be to solve the puzzle
@@ -59,6 +59,11 @@ unflattened :: [Square] -> Int -> [[Square]]
 unflattened [] _ = []
 unflattened r s = (take s r):(unflattened (drop s r) s)
 
+-- deleteAll x lst deletes all occurrences of x in lst and returns the result 
+deleteAll :: Eq a => a -> [a] -> [a]
+deleteAll _ [] = []
+deleteAll e (x:xs) = if (e == x) then deleteAll e xs else x:deleteAll e xs
+
 -- squareAt p x y returns is the square at column x and row y in Puzzle p
 squareAt :: Puzzle -> (Int, Int) -> Square
 squareAt p (x,y) = ((rows p) !! y) !! x
@@ -71,6 +76,10 @@ firstEmpty p
 	| otherwise = Just (fromJust index `mod` (size p), fromJust index `div` (size p))
 	where
 		index = elemIndex Empty (flattened (rows p))
+
+-- filled returns true if the puzzle has no empty squares 
+filled :: Puzzle -> Bool 
+filled p = firstEmpty p == Nothing
 
 -- replaceAt i x lst returns lst with element at index i replaced with x
 replaceAt :: Int -> a -> [a] -> [a]
@@ -85,40 +94,87 @@ setSquare p s (x,y) = Puzzle (size p) (unflattened (replaceAt (y * (size p) + x)
 rowSolved :: [Square] -> Bool
 rowSolved [] = True
 rowSolved (Blocked:xs) = rowSolved xs
-rowSolved (Clue (_,c):xs) = notElem 0 entryValues && (sum entryValues == c) && noRepeats && rowSolved remainder
+rowSolved (Clue (_,c):xs) = notElem 0 squareValues && (sum squareValues == c) && noRepeats && rowSolved remainder
 	where 
-		entryValues = [entryVal e | e <- takeWhile isWritable xs]
-		noRepeats = ((length (nub entryValues)) == (length entryValues))
-		remainder = dropWhile isEntry xs 
+		squareValues = [entryVal e | e <- takeWhile isWritable xs]
+		noRepeats = ((length (nub squareValues)) == (length squareValues))
+		remainder = dropWhile isWritable xs 
 	
 -- colSolved l is true if the given column is solved 
 colSolved :: [Square] -> Bool 
 colSolved [] = True 
 colSolved (Blocked:xs) = colSolved xs
-colSolved (Clue (c,_):xs) = notElem 0 entryValues && (sum entryValues == c) && noRepeats && colSolved remainder
+colSolved (Clue (c,_):xs) = notElem 0 squareValues && (sum squareValues == c) && noRepeats && colSolved remainder
 	where 
-		entryValues = [entryVal e | e <- takeWhile isWritable xs]
-		noRepeats = ((length (nub entryValues)) == (length entryValues))
-		remainder = dropWhile isEntry xs 
+		squareValues = [entryVal e | e <- takeWhile isWritable xs]
+		noRepeats = ((length (nub squareValues)) == (length squareValues))
+		remainder = dropWhile isWritable xs 
 
 -- solved p returns true if p is a solved puzzle 
 solved :: Puzzle -> Bool
 solved p = (and [rowSolved r | r <- rows p]) && (and [colSolved c | c <- columns p])
 
 
+solved' :: Puzzle -> Bool 
+solved' p = isValid p && filled p
+
+
 -- Returns Nothing if it is not solvable or returns Just p where p is the solved 
--- version of the board
-{-
+-- version of the board, assumes board given is valid 
+
 solve :: Puzzle -> Maybe Puzzle
 solve p  
 	| solved p = Just p
 	| otherwise = solveAll (nextPuzzles p)
--}
+
+
+solve' :: Puzzle -> Maybe Puzzle
+solve' p 
+	| filled p = Just p
+	| otherwise = solveAll' (nextPuzzles p) 
+
+solveAll' :: [Puzzle] -> Maybe Puzzle
+solveAll' [] = Nothing 
+solveAll' (p:ps) = if (solve' p) == Nothing then solveAll' ps else solve' p
+
+solveAll :: [Puzzle] -> Maybe Puzzle
+solveAll [] = Nothing
+solveAll (p:ps) = if (solve p) == Nothing then solveAll ps else solve p
+
 
 -- nextPuzzles p returns a list of puzzles with the first Empty in p replaced by Entry 1 to 9
 nextPuzzles :: Puzzle -> [Puzzle]
-nextPuzzles p = map (\x -> (setSquare p (Entry x) (fromJust . firstEmpty $ p))) [1..9]
+nextPuzzles p = if (firstEmpty p) == Nothing then [] else filter isValid (map (\x -> (setSquare p (Entry x) (fromJust . firstEmpty $ p))) [1..9])
 
+-- isValid p returns true if the entries in p don't break any of the kakuro's rules
+isValid :: Puzzle -> Bool
+isValid p = (and [isRowValid r | r <- rows p]) && (and [isColValid c | c <- columns p])
+
+-- isRowValid returns true if the given row doesn't break any of the rules (no duplicates and sum <= clue)
+isRowValid :: [Square] -> Bool
+isRowValid [] = True
+isRowValid (Blocked:xs) = isRowValid xs
+isRowValid (Clue (_,c):xs) = validSum && noRepeats && isRowValid remainder
+	where 
+		squareValues = [entryVal e | e <- takeWhile isWritable xs]
+		entryValues = deleteAll 0 squareValues
+		noRepeats = ((length (nub entryValues)) == (length entryValues))
+		filledIn = entryValues == squareValues
+		validSum = ((filledIn && sum squareValues == c) || (not filledIn && sum squareValues < c))
+		remainder = dropWhile isWritable xs 
+
+-- isColValid returns true if the given column doesn't break any of the rules (no duplicates and sum <= clue)
+isColValid :: [Square] -> Bool
+isColValid [] = True
+isColValid (Blocked:xs) = isColValid xs
+isColValid (Clue (c,_):xs) = validSum && noRepeats && isColValid remainder
+	where 
+		squareValues = [entryVal e | e <- takeWhile isWritable xs]
+		entryValues = deleteAll 0 squareValues
+		noRepeats = ((length (nub entryValues)) == (length entryValues))
+		filledIn = entryValues == squareValues
+		validSum = ((filledIn && sum squareValues == c) || (not filledIn && sum squareValues < c))
+		remainder = dropWhile isWritable xs 
 
 
 --TEST CASES--
@@ -128,6 +184,12 @@ nextPuzzles p = map (\x -> (setSquare p (Entry x) (fromJust . firstEmpty $ p))) 
 
 -- This sets p2 to p1 except for the last entry is altered so it is incorrect 
 -- let p2 = Puzzle 6 [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23), Entry 8, Entry 6, Entry 9, Clue (29, 0), Blocked], [Clue (0,27),Entry 9,Entry 3,Entry 7,Entry 8,Clue (8,0)],[Clue (0,4), Entry 3, Entry 1, Clue (9,8), Entry 7, Entry 1], [Blocked, Clue (0,23),Entry 2,Entry 8,Entry 9,Entry 4],[Blocked,Blocked,Clue (0,9),Entry 1,Entry 5, Entry 2]]
+
+-- This sets p3 to the unsolved version of p1 
+-- let p3 = Puzzle 6 [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23),Empty, Empty, Empty, Clue (29, 0), Blocked], [Clue (0,27),Empty,Empty,Empty,Empty,Clue (8,0)],[Clue (0,4), Empty, Empty, Clue (9,8), Empty, Empty], [Blocked, Clue (0,23),Empty,Empty,Empty,Empty],[Blocked,Blocked,Clue (0,9),Empty,Empty, Empty]]
+
+-- let p4 = Puzzle 6 [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23), Empty, Empty, Empty, Clue (29, 0), Blocked], [Clue (0,27),Entry 9,Empty,Empty,Empty,Clue (8,0)],[Clue (0,4), Entry 3, Empty, Clue (9,8), Entry 7, Entry 1], [Blocked, Clue (0,23),Entry 2,Entry 8,Entry 9,Entry 4],[Blocked,Blocked,Clue (0,9),Entry 1,Entry 5, Entry 3]]
+
 
 -- Now try: 
 -- column p1, 3
