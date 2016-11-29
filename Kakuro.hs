@@ -136,6 +136,9 @@ solveAllOld (p:ps) = if (solveOld p) == Nothing then solveAllOld ps else solveOl
 nextPuzzlesOld :: Puzzle -> [Puzzle]
 nextPuzzlesOld p = if (firstEmpty p) == Nothing then [] else map (\x -> (setSquare p (Entry x) (fromJust . firstEmpty $ p))) [1..9]
 
+-- solved p returns true if the board is solved 
+solved :: Puzzle -> Bool 
+solved p = isValid p && filled p
 
 -- solve p returns Nothing if it is not solvable or returns Just p0 where p0 is the solved 
 -- version of the board, assumes board given is valid 
@@ -234,7 +237,7 @@ permute n l = [x:xs | x:xs' <- tails l,xs <- permute (n-1) xs']
 -- This sets p3 to the unsolved version of p1 
 -- let p3 = Puzzle 6 [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23),Empty, Empty, Empty, Clue (29, 0), Blocked], [Clue (0,27),Empty,Empty,Empty,Empty,Clue (8,0)],[Clue (0,4), Empty, Empty, Clue (9,8), Empty, Empty], [Blocked, Clue (0,23),Empty,Empty,Empty,Empty],[Blocked,Blocked,Clue (0,9),Empty,Empty, Empty]]
 
--- let p4 = Puzzle 6 [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23), Empty, Empty, Empty, Clue (29, 0), Blocked], [Clue (0,27),Entry 9,Empty,Empty,Empty,Clue (8,0)],[Clue (0,4), Entry 3, Empty, Clue (9,8), Entry 7, Entry 1], [Blocked, Clue (0,23),Entry 2,Entry 8,Entry 9,Entry 4],[Blocked,Blocked,Clue (0,9),Entry 1,Entry 5, Entry 3]]
+-- let p4 = Puzzle 6 [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23), Empty, Empty, Empty, Clue (29, 0), Blocked], [Clue (0,27),Empty,Empty,Empty,Empty,Clue (8,0)],[Clue (0,4), Empty, Empty, Clue (9,8), Empty, Empty], [Blocked, Clue (0,23),Entry 2,Entry 8,Empty,Empty],[Blocked,Blocked,Clue (0,9),Entry 1,Entry 5, Entry 3]]
 
 
 -- Now try: 
