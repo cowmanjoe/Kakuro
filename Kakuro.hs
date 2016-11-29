@@ -35,6 +35,10 @@ isEntry :: Square -> Bool
 isEntry (Entry _) = True 
 isEntry _ = False 
 
+-- toEntry n returns Entry s 
+toEntry :: Int -> Square
+toEntry x = Entry x
+
 -- isEmpty s returns true if squre s is empty
 isEmpty :: Square -> Bool
 isEmpty Empty = True
@@ -110,72 +114,114 @@ colSolved (Clue (c,_):xs) = notElem 0 squareValues && (sum squareValues == c) &&
 		noRepeats = ((length (nub squareValues)) == (length squareValues))
 		remainder = dropWhile isWritable xs 
 
--- solved p returns true if p is a solved puzzle 
-solved :: Puzzle -> Bool
-solved p = (and [rowSolved r | r <- rows p]) && (and [colSolved c | c <- columns p])
+-- Functions with "Old" appended to the end were the naive, slower versions of the functions 
+-- I wrote before implementing arc and domain consistency wherever possible 		
+
+-- solvedOld p returns true if p is a solvedOld puzzle (much slower than solve)
+solvedOld :: Puzzle -> Bool
+solvedOld p = (and [rowSolved r | r <- rows p]) && (and [colSolved c | c <- columns p])
 
 
-solved' :: Puzzle -> Bool 
-solved' p = isValid p && filled p
+solveOld :: Puzzle -> Maybe Puzzle
+solveOld p  
+	| solvedOld p = Just p
+	| otherwise = solveAllOld (nextPuzzlesOld p)
+
+	
+solveAllOld :: [Puzzle] -> Maybe Puzzle
+solveAllOld [] = Nothing
+solveAllOld (p:ps) = if (solveOld p) == Nothing then solveAllOld ps else solveOld p
 
 
--- Returns Nothing if it is not solvable or returns Just p where p is the solved 
+nextPuzzlesOld :: Puzzle -> [Puzzle]
+nextPuzzlesOld p = if (firstEmpty p) == Nothing then [] else map (\x -> (setSquare p (Entry x) (fromJust . firstEmpty $ p))) [1..9]
+
+
+-- solve p returns Nothing if it is not solvable or returns Just p0 where p0 is the solved 
 -- version of the board, assumes board given is valid 
 
 solve :: Puzzle -> Maybe Puzzle
-solve p  
-	| solved p = Just p
-	| otherwise = solveAll (nextPuzzles p)
-
-
-solve' :: Puzzle -> Maybe Puzzle
-solve' p 
+solve p 
 	| filled p = Just p
-	| otherwise = solveAll' (nextPuzzles p) 
-
-solveAll' :: [Puzzle] -> Maybe Puzzle
-solveAll' [] = Nothing 
-solveAll' (p:ps) = if (solve' p) == Nothing then solveAll' ps else solve' p
+	| otherwise = solveAll (nextPuzzles p) 
 
 solveAll :: [Puzzle] -> Maybe Puzzle
-solveAll [] = Nothing
+solveAll [] = Nothing 
 solveAll (p:ps) = if (solve p) == Nothing then solveAll ps else solve p
+
 
 
 -- nextPuzzles p returns a list of puzzles with the first Empty in p replaced by Entry 1 to 9
 nextPuzzles :: Puzzle -> [Puzzle]
-nextPuzzles p = if (firstEmpty p) == Nothing then [] else filter isValid (map (\x -> (setSquare p (Entry x) (fromJust . firstEmpty $ p))) [1..9])
+nextPuzzles p = if varSquare == Nothing then [] else filter validNumber (map (\x -> (setSquare p (Entry x) (fromJust . firstEmpty $ p))) [1..9])
+	where 
+		varSquare = firstEmpty p
+		squareX = if varSquare == Nothing then -1 else fst . fromJust $ varSquare
+		squareY = if varSquare == Nothing then -1 else snd . fromJust $ varSquare
+		validNumber p = (isRowValid (row p squareY)) && (isColValid (column p squareX))
 
--- isValid p returns true if the entries in p don't break any of the kakuro's rules
+
+-- isValid p returns false if we can rule this puzzle out as a possible partial 
+-- (or full) solution, and true otherwise 
 isValid :: Puzzle -> Bool
 isValid p = (and [isRowValid r | r <- rows p]) && (and [isColValid c | c <- columns p])
 
--- isRowValid returns true if the given row doesn't break any of the rules (no duplicates and sum <= clue)
+-- isRowValid returns false if we can rule this row out as a possible partial
+-- solution, and true otherwise 
 isRowValid :: [Square] -> Bool
 isRowValid [] = True
 isRowValid (Blocked:xs) = isRowValid xs
-isRowValid (Clue (_,c):xs) = validSum && noRepeats && isRowValid remainder
+isRowValid (Clue (_,c):xs) = validSum && noRepeats && isPossible && isRowValid remainder
 	where 
-		squareValues = [entryVal e | e <- takeWhile isWritable xs]
+		group = takeWhile isWritable xs
+		squareValues = [entryVal e | e <- group]
 		entryValues = deleteAll 0 squareValues
 		noRepeats = ((length (nub entryValues)) == (length entryValues))
 		filledIn = entryValues == squareValues
 		validSum = ((filledIn && sum squareValues == c) || (not filledIn && sum squareValues < c))
 		remainder = dropWhile isWritable xs 
+		isPossible = [] `notElem` groupPossibilities c group
 
--- isColValid returns true if the given column doesn't break any of the rules (no duplicates and sum <= clue)
+-- isColValid returns false if we can rule this column out as a possible partial
+-- solution, and true otherwise 
 isColValid :: [Square] -> Bool
 isColValid [] = True
 isColValid (Blocked:xs) = isColValid xs
-isColValid (Clue (c,_):xs) = validSum && noRepeats && isColValid remainder
+isColValid (Clue (c,_):xs) = validSum && noRepeats && isPossible && isColValid remainder
 	where 
-		squareValues = [entryVal e | e <- takeWhile isWritable xs]
+		group = takeWhile isWritable xs 
+		squareValues = [entryVal e | e <- group]
 		entryValues = deleteAll 0 squareValues
 		noRepeats = ((length (nub entryValues)) == (length entryValues))
 		filledIn = entryValues == squareValues
 		validSum = ((filledIn && sum squareValues == c) || (not filledIn && sum squareValues < c))
 		remainder = dropWhile isWritable xs 
+		isPossible = [] `notElem` groupPossibilities c group
 
+-- groupPossibilities c s takes clue c and list of squares s and returns a list of lists of squares
+-- where each item in the list is the list of possible squares for that cell 
+-- Cells are required to be Empty or Entry i
+
+groupPossibilities :: Int -> [Square] -> [[Square]]
+groupPossibilities _ [] = []
+groupPossibilities c s = map (\l -> map toEntry l) intAnswer
+	where 
+		squareValues = [entryVal e | e <- s]
+		entryValues = deleteAll 0 squareValues 
+		newClue = c - sum entryValues
+		numEmpty = length s - length entryValues 
+		intAnswer = map (\x -> if x == Empty then filter (`notElem` entryValues) (possibilities newClue numEmpty) else [entryVal x]) s
+
+-- possibilities c n returns possibilities of each cell for a cell group of size n with a clue of c 
+possibilities :: Int -> Int -> [Int]
+possibilities c n = foldl union [] allPerms
+	where 
+		allPerms = filter (\x -> sum x == c) $ permute n [1..9]
+		
+-- Permutes the given values in a list of given length
+permute :: (Num a, Eq a) => a -> [b] -> [[b]]
+permute 0 _ = [[]]
+permute n l = [x:xs | x:xs' <- tails l,xs <- permute (n-1) xs']
 
 --TEST CASES--
 
