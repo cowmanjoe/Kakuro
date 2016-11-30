@@ -2,6 +2,7 @@ module Kakuro where
 
 import Data.List
 import Data.Maybe
+import Data.Char
 
 -- Represents a size x size Kakuro puzzle 
 -- Size of rows and each element of rows must be size
@@ -11,21 +12,33 @@ data Puzzle' = Puzzle' {  size :: Int,
 					 } deriving (Show,Eq)
 -}
 					 
-data Puzzle = Puzzle { rows :: [[Square]] } deriving (Show, Eq)
---instance Show Puzzle where 
+data Puzzle = Puzzle { rows :: [[Square]] } deriving (Show,Eq)
+
+
+drawPuzzle :: Puzzle -> IO () 
+drawPuzzle p = putStr ((foldl (++) "" (map drawRow (rows p)) ) ++ drawLastLine (size p))
+
 	
-{-
+drawRow :: [Square] -> String
+drawRow r = foldl (++) "" (map (\x -> drawTextLine x r) [0..3])
+	
+drawLastLine s = drawTextLine 0 (replicate s Empty) 
+	
 -- returns a string for each of the 4 rows of a cell in a puzzle (which depending on the first arg)
 drawTextLine :: Int -> [Square] -> String
-drawTextLine 0 r = (foldl (++) "" (replicate (length r) "+---")) ++ "+\n"
-drawTextLine 1 r = 
-	where
-		cellLine :: Int -> Square -> String
-		cellLine 1 Empty = "|   "
-		cellLine 1 (Entry x) = "| " ++ number x ++ " "
-		cellLine 1 (Clue (v,h)) = if h == 0 then "|\\  " else ""
-	
--}	
+drawTextLine 0 r = foldl (++) "" (map (cellLine 0) r) ++ "+\n"
+drawTextLine n r = foldl (++) "" (map (cellLine n) r) ++ "|\n"
+		
+		 
+cellLine 0 _ = "+---"
+cellLine _ Empty = "|   "
+cellLine _ Blocked = "|xxx"
+cellLine 2 (Entry x) = "| " ++ show x ++ " "
+cellLine _ (Entry x) = "|   "
+cellLine 1 (Clue (_,h)) = if h == 0 then "|\\  " else take 4 ("|\\" ++ show h ++ " ")
+cellLine 2 (Clue (_,_)) = "| \\ "
+cellLine 3 (Clue (v,_)) = if v == 0 then "|  \\" else take 3 ("|" ++ show v ++ " ") ++ "\\"	
+
 -- Blocked indicates this square does not need to be filled in
 -- Empty indicates this square is not filled in, and needs to be to solve the puzzle
 -- Clue (Int, Int) is a clue square where the first of the tuple is the vertical clue and  
