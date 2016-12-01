@@ -258,7 +258,6 @@ permute 0 _ = [[]]
 permute n l = [x:xs | x:xs' <- tails l,xs <- permute (n-1) xs']
 
 
-abcd
 
 --TEST CASES--
 
