@@ -4,32 +4,27 @@ import Data.List
 import Data.Maybe
 import Data.Char
 
--- Represents a size x size Kakuro puzzle 
--- Size of rows and each element of rows must be size
-{-
-data Puzzle' = Puzzle' {  size :: Int,
-						rows :: [[Square]]  	
-					 } deriving (Show,Eq)
--}
-					 
+-- Represents an n x n Kakuro puzzle 
+-- Size of rows and each element of rows must be equal				 
 data Puzzle = Puzzle { rows :: [[Square]] } deriving (Show,Eq)
 
-
+-- Outputs a string representation of a puzzle that is readable
 drawPuzzle :: Puzzle -> IO () 
 drawPuzzle p = putStr ((foldl (++) "" (map drawRow (rows p)) ) ++ drawLastLine (size p))
 
-	
+-- Returns a string representation of a row of squares in a puzzle
 drawRow :: [Square] -> String
 drawRow r = foldl (++) "" (map (\x -> drawTextLine x r) [0..3])
 	
-drawLastLine s = drawTextLine 0 (replicate s Empty) 
+-- Returns a string representation final line of size s (same as first line)
+drawLastLine s = foldl (++) "" (replicate s "+---") ++ "+\n"
 	
 -- returns a string for each of the 4 rows of a cell in a puzzle (which depending on the first arg)
 drawTextLine :: Int -> [Square] -> String
-drawTextLine 0 r = foldl (++) "" (map (cellLine 0) r) ++ "+\n"
+drawTextLine 0 r = drawLastLine (length r)
 drawTextLine n r = foldl (++) "" (map (cellLine n) r) ++ "|\n"
 		
-		 
+-- Helper function for drawTextLine to draw a line of an individual cell		 
 cellLine 0 _ = "+---"
 cellLine _ Empty = "|   "
 cellLine _ Blocked = "|xxx"
@@ -118,7 +113,7 @@ firstEmpty p
 -- filled returns true if the puzzle has no empty squares 
 filled :: Puzzle -> Bool 
 filled p = firstEmpty p == Nothing
--------------------------
+
 -- replaceAt i x lst returns lst with element at index i replaced with x
 replaceAt :: Int -> a -> [a] -> [a]
 replaceAt 0 e (x:xs) = e:xs
@@ -277,6 +272,10 @@ permute n l = [x:xs | x:xs' <- tails l,xs <- permute (n-1) xs']
 
 
 -- Now try: 
--- column p1, 3
+-- drawPuzzle p1
 -- solved p1
+-- drawPuzzle p2
 -- solved p2
+-- drawPuzzle p4
+-- let p5 = fromJust (solve p4)
+-- drawPuzzle p5
