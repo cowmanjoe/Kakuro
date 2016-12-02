@@ -3,24 +3,64 @@ module Kakuro where
 import Data.List
 import Data.Maybe
 import Data.Char
+import Control.Exception
+import System.CPUTime
+
+
 
 -- Represents an n x n Kakuro puzzle 
--- Size of rows and each element of rows must be equal		
--- This can be used to represent any kakuro even if it isn't square by 
--- simply adding Blocked squares to fill and make it a square 		 
+-- Size of rows and each element of rows must be equal				 
 data Puzzle = Puzzle { rows :: [[Square]] } deriving (Show,Eq)
-
--- Blocked indicates this square does not need to be filled in
--- Empty indicates this square is not filled in, and needs to be to solve the puzzle
--- Clue (Int, Int) is a clue square where the first of the tuple is the vertical clue and  
--- the second of the tuple is the horizontal clue. If one of the tuples is 0, then there
--- is no horizontal or vertical clue depending on which one is 0
--- Entry Int is an entry into an empty space
-data Square = Blocked | Empty | Clue (Int, Int) | Entry Int deriving (Show, Eq)
 
 -- Outputs a string representation of a puzzle that is readable
 drawPuzzle :: Puzzle -> IO () 
 drawPuzzle p = putStr ((foldl (++) "" (map drawRow (rows p)) ) ++ drawLastLine (size p))
+
+-- Outputs a text file that contains a puzzle give it a file name, "filename.txt" and a puzzle
+exportPuzzle name p = writeFile name ((foldl (++) "" (map drawRow (rows p)) ) ++ drawLastLine (size p))
+
+
+-- This timing stuff is taken directly from the Haskell website, worked better than importing code by hand
+timeIt :: (Fractional c) => (a -> IO b) -> a -> IO c
+timeIt action arg =
+  do startTime <- getCPUTime
+     action arg
+     finishTime <- getCPUTime
+     return $ fromIntegral (finishTime - startTime) / 1000000000000
+ 
+ 
+timePuzzle :: (Fractional c) => (a -> b) -> a -> IO c
+timePuzzle f = timeIt (\x -> f x `seq` return ())
+
+
+readSolveandExport name ename = do 
+                                  p <- readPuzzle name
+                                  solveAndExport ename p								  
+
+-- Takes a file name and a puzzle and solves the puzzle and exports it.
+solveAndExport name p = do
+                           print ("Starting to solve")
+                           let rp = fromMaybe p (solve p)
+                           writeFile name ((foldl (++) "" (map drawRow (rows rp)) ) ++ drawLastLine (size rp))
+                           print ("Solved and exported")
+
+
+--Takes in a filename and returns a puzzle						   
+readPuzzle name = do
+                    content <- readFile (name)
+                    let linesOfFiles = lines content
+                    let p = convertStrings linesOfFiles
+                    let p1 = Puzzle p
+                    return p1
+
+--Helper to convert a list of strings into a list of lists of squares
+convertStrings :: [String] -> [[Square]]
+convertStrings strlst = map stringToSquare strlst
+
+--Helper to convert a string into a list of squares
+stringToSquare :: String -> [Square]
+stringToSquare str = map read (words str)
+					  
 
 -- Returns a string representation of a row of squares in a puzzle
 drawRow :: [Square] -> String
@@ -34,7 +74,7 @@ drawTextLine :: Int -> [Square] -> String
 drawTextLine 0 r = drawLastLine (length r)
 drawTextLine n r = foldl (++) "" (map (cellLine n) r) ++ "|\n"
 		
--- Helper function for drawTextLine to draw a line (0-3) of an individual cell		 
+-- Helper function for drawTextLine to draw a line of an individual cell		 
 cellLine 0 _ = "+---"
 cellLine _ Empty = "|   "
 cellLine _ Blocked = "|xxx"
@@ -43,6 +83,14 @@ cellLine _ (Entry x) = "|   "
 cellLine 1 (Clue (_,h)) = if h == 0 then "|\\  " else take 4 ("|\\" ++ show h ++ " ")
 cellLine 2 (Clue (_,_)) = "| \\ "
 cellLine 3 (Clue (v,_)) = if v == 0 then "|  \\" else take 3 ("|" ++ show v ++ " ") ++ "\\"	
+
+-- Blocked indicates this square does not need to be filled in
+-- Empty indicates this square is not filled in, and needs to be to solve the puzzle
+-- Clue (Int, Int) is a clue square where the first of the tuple is the vertical clue and  
+-- the second of the tuple is the horizontal clue. If one of the tuples is 0, then there
+-- is no horizontal or vertical clue depending on which one is 0
+-- Entry Int is an entry into an empty space
+data Square = Blocked | Empty | Clue (Int, Int) | Entry Int deriving (Show, Eq, Read)
 
 
 size :: Puzzle -> Int
@@ -210,6 +258,8 @@ isRowValid (Clue (_,c):xs) = isValidGroup c group && isRowValid remainder
 		group = takeWhile isWritable xs
 		remainder = dropWhile isWritable xs 
 
+		
+
 
 -- isColValid returns false if we can rule this column out as a possible partial
 -- solution, and true otherwise 
@@ -257,22 +307,17 @@ permute :: (Num a, Eq a) => a -> [b] -> [[b]]
 permute 0 _ = [[]]
 permute n l = [x:xs | x:xs' <- tails l,xs <- permute (n-1) xs']
 
-
-
 --TEST CASES--
 
+-- This sets p1 to a solved 6x6 puzzle: 
+-- let p1 = Puzzle [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23), Entry 8, Entry 6, Entry 9, Clue (29, 0), Blocked], [Clue (0,27),Entry 9,Entry 3,Entry 7,Entry 8,Clue (8,0)],[Clue (0,4), Entry 3, Entry 1, Clue (9,8), Entry 7, Entry 1], [Blocked, Clue (0,23),Entry 2,Entry 8,Entry 9,Entry 4],[Blocked,Blocked,Clue (0,9),Entry 1,Entry 5, Entry 3]]
 
+-- This sets p2 to p1 except for the last entry is altered so it is incorrect 
+-- let p2 = Puzzle [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23), Entry 8, Entry 6, Entry 9, Clue (29, 0), Blocked], [Clue (0,27),Entry 9,Entry 3,Entry 7,Entry 8,Clue (8,0)],[Clue (0,4), Entry 3, Entry 1, Clue (9,8), Entry 7, Entry 1], [Blocked, Clue (0,23),Entry 2,Entry 8,Entry 9,Entry 4],[Blocked,Blocked,Clue (0,9),Entry 1,Entry 5, Entry 2]]
 
--- This sets p1 to a solved 5x5 puzzle:
--- let p1 = Puzzle [[Blocked,Clue(23,0),Clue(22,0),Blocked,Blocked],[Clue(0,16),Entry 9, Entry 7,Clue(7,0),Clue(22,0)],[Clue(0,20),Entry 8,Entry 6,Entry 1,Entry 5],[Clue(0,25),Entry 6,Entry 9,Entry 2,Entry 8],[Blocked,Blocked,Clue(0,13),Entry 4,Entry 9]]
+-- This sets p3 to the unsolved version of p1 
+-- let p3 = Puzzle [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23),Empty, Empty, Empty, Clue (29, 0), Blocked], [Clue (0,27),Empty,Empty,Empty,Empty,Clue (8,0)],[Clue (0,4), Empty, Empty, Clue (9,8), Empty, Empty], [Blocked, Clue (0,23),Empty,Empty,Empty,Empty],[Blocked,Blocked,Clue (0,9),Empty,Empty, Empty]]
 
--- This sets p2 to the empty version of p1:
--- let p2 = Puzzle [[Blocked, Clue(23,0),Clue(22,0),Blocked,Blocked],[Clue(0,16),Empty,Empty,Clue(7,0),Clue(22,0)],[Clue(0,20),Empty,Empty,Empty,Empty],[Clue(0,25),Empty,Empty,Empty,Empty],[Blocked,Blocked,Clue(0,13),Empty,Empty]]
-
--- This sets p3 to an incorrectly solved version of p1: 
--- let p3 = Puzzle [[Blocked,Clue(23,0),Clue(22,0),Blocked,Blocked],[Clue(0,16),Entry 8, Entry 7,Clue(7,0),Clue(22,0)],[Clue(0,20),Entry 8,Entry 6,Entry 1,Entry 5],[Clue(0,25),Entry 6,Entry 9,Entry 2,Entry 8],[Blocked,Blocked,Clue(0,13),Entry 4,Entry 9]]
-
--- This sets p4 to a partially solved 6x6 puzzle: 
 -- let p4 = Puzzle [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23), Empty, Empty, Empty, Clue (29, 0), Blocked], [Clue (0,27),Empty,Empty,Empty,Empty,Clue (8,0)],[Clue (0,4), Empty, Empty, Clue (9,8), Empty, Empty], [Blocked, Clue (0,23),Entry 2,Entry 8,Empty,Empty],[Blocked,Blocked,Clue (0,9),Entry 1,Entry 5, Entry 3]]
 
 
@@ -281,15 +326,6 @@ permute n l = [x:xs | x:xs' <- tails l,xs <- permute (n-1) xs']
 -- solved p1
 -- drawPuzzle p2
 -- solved p2
--- p1 == fromJust . solve $ p2
--- drawPuzzle p3
--- solved p3
-
 -- drawPuzzle p4
--- let p5 = fromJust . solve $ p4
+-- let p5 = fromJust (solve p4)
 -- drawPuzzle p5
-
-
--- Now try these and observe they make ghci hang for an extremely long time:
--- solveOld p2
--- solveOld p4
