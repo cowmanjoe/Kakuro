@@ -33,26 +33,36 @@ timePuzzle :: (Fractional c) => (a -> b) -> a -> IO c
 timePuzzle f = timeIt (\x -> f x `seq` return ())
 
 
-readSolveandExport name ename = do 
-                                  p <- readPuzzle name
+readSolveAndExport name ename = do 
+                                  p <- readIOPuzzle name
                                   solveAndExport ename p								  
 
 -- Takes a file name and a puzzle and solves the puzzle and exports it.
 solveAndExport name p = do
-                           print ("Starting to solve")
+                           putStrLn ("Starting to solve...")
                            let rp = fromMaybe p (solve p)
                            writeFile name ((foldl (++) "" (map drawRow (rows rp)) ) ++ drawLastLine (size rp))
-                           print ("Solved and exported")
+                           putStrLn ("Solved and exported.")
 
 
---Takes in a filename and returns a puzzle						   
-readPuzzle name = do
+-- Takes in a filename and returns an IO puzzle						   
+readIOPuzzle name = do
                     content <- readFile (name)
                     let linesOfFiles = lines content
                     let p = convertStrings linesOfFiles
                     let p1 = Puzzle p
                     return p1
 
+-- Draws an IO puzzle
+drawIOPuzzle p = do 
+					puz <- p
+					drawPuzzle puz
+
+solveIOPuzzle p = do 
+					puz <- p 
+					if solve puz == Nothing then return (Puzzle []) else return (fromJust . solve $ puz)
+					
+					
 --Helper to convert a list of strings into a list of lists of squares
 convertStrings :: [String] -> [[Square]]
 convertStrings strlst = map stringToSquare strlst
@@ -307,17 +317,21 @@ permute :: (Num a, Eq a) => a -> [b] -> [[b]]
 permute 0 _ = [[]]
 permute n l = [x:xs | x:xs' <- tails l,xs <- permute (n-1) xs']
 
+
 --TEST CASES--
 
--- This sets p1 to a solved 6x6 puzzle: 
--- let p1 = Puzzle [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23), Entry 8, Entry 6, Entry 9, Clue (29, 0), Blocked], [Clue (0,27),Entry 9,Entry 3,Entry 7,Entry 8,Clue (8,0)],[Clue (0,4), Entry 3, Entry 1, Clue (9,8), Entry 7, Entry 1], [Blocked, Clue (0,23),Entry 2,Entry 8,Entry 9,Entry 4],[Blocked,Blocked,Clue (0,9),Entry 1,Entry 5, Entry 3]]
 
--- This sets p2 to p1 except for the last entry is altered so it is incorrect 
--- let p2 = Puzzle [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23), Entry 8, Entry 6, Entry 9, Clue (29, 0), Blocked], [Clue (0,27),Entry 9,Entry 3,Entry 7,Entry 8,Clue (8,0)],[Clue (0,4), Entry 3, Entry 1, Clue (9,8), Entry 7, Entry 1], [Blocked, Clue (0,23),Entry 2,Entry 8,Entry 9,Entry 4],[Blocked,Blocked,Clue (0,9),Entry 1,Entry 5, Entry 2]]
 
--- This sets p3 to the unsolved version of p1 
--- let p3 = Puzzle [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23),Empty, Empty, Empty, Clue (29, 0), Blocked], [Clue (0,27),Empty,Empty,Empty,Empty,Clue (8,0)],[Clue (0,4), Empty, Empty, Clue (9,8), Empty, Empty], [Blocked, Clue (0,23),Empty,Empty,Empty,Empty],[Blocked,Blocked,Clue (0,9),Empty,Empty, Empty]]
+-- This sets p1 to a solved 5x5 puzzle:
+-- let p1 = Puzzle [[Blocked,Clue(23,0),Clue(22,0),Blocked,Blocked],[Clue(0,16),Entry 9, Entry 7,Clue(7,0),Clue(22,0)],[Clue(0,20),Entry 8,Entry 6,Entry 1,Entry 5],[Clue(0,25),Entry 6,Entry 9,Entry 2,Entry 8],[Blocked,Blocked,Clue(0,13),Entry 4,Entry 9]]
 
+-- This sets p2 to the empty version of p1:
+-- let p2 = Puzzle [[Blocked, Clue(23,0),Clue(22,0),Blocked,Blocked],[Clue(0,16),Empty,Empty,Clue(7,0),Clue(22,0)],[Clue(0,20),Empty,Empty,Empty,Empty],[Clue(0,25),Empty,Empty,Empty,Empty],[Blocked,Blocked,Clue(0,13),Empty,Empty]]
+
+-- This sets p3 to an incorrectly solved version of p1: 
+-- let p3 = Puzzle [[Blocked,Clue(23,0),Clue(22,0),Blocked,Blocked],[Clue(0,16),Entry 8, Entry 7,Clue(7,0),Clue(22,0)],[Clue(0,20),Entry 8,Entry 6,Entry 1,Entry 5],[Clue(0,25),Entry 6,Entry 9,Entry 2,Entry 8],[Blocked,Blocked,Clue(0,13),Entry 4,Entry 9]]
+
+-- This sets p4 to a partially solved 6x6 puzzle: 
 -- let p4 = Puzzle [[Blocked, Clue (20,0), Clue (12,0), Clue (16,0), Blocked, Blocked],[Clue (0, 23), Empty, Empty, Empty, Clue (29, 0), Blocked], [Clue (0,27),Empty,Empty,Empty,Empty,Clue (8,0)],[Clue (0,4), Empty, Empty, Clue (9,8), Empty, Empty], [Blocked, Clue (0,23),Entry 2,Entry 8,Empty,Empty],[Blocked,Blocked,Clue (0,9),Entry 1,Entry 5, Entry 3]]
 
 
@@ -326,6 +340,26 @@ permute n l = [x:xs | x:xs' <- tails l,xs <- permute (n-1) xs']
 -- solved p1
 -- drawPuzzle p2
 -- solved p2
+-- p1 == fromJust . solve $ p2
+-- drawPuzzle p3
+-- solved p3
+
 -- drawPuzzle p4
--- let p5 = fromJust (solve p4)
+-- let p5 = fromJust . solve $ p4
 -- drawPuzzle p5
+
+-- The following reads a puzzle from puzzletest.txt, draws it, then draws the solution: 
+-- let p6 = readIOPuzzle "puzzletest.txt" 
+-- drawIOPuzzle p6
+-- let p7 = solveIOPuzzle p6
+-- drawIOPuzzle p7 
+
+-- This code does the same in 1 line except it outputs the text to out.txt:
+-- readSolveAndExport "puzzletest.txt" "out.txt"
+
+-- Observe that the printed puzzle is the same as the one in out.txt
+
+
+-- Now try these and observe they make ghci hang for an extremely long time:
+-- solveOld p2
+-- solveOld p4
