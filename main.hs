@@ -52,7 +52,7 @@ puzzleWindow p = do
 displayPuzzle  :: Puzzle -> DisplayCallback 
 displayPuzzle p = do  
   clear [ ColorBuffer ]
-  color $ Color3 0 0 (0 :: GLfloat) 
+  color3f 0 0 0
   renderPuzzle p
   flush
 
@@ -63,18 +63,19 @@ renderPuzzle p = do
 
 
 renderCells :: Puzzle -> IO () 
-renderCells p = mapM_ (\row -> renderRow ((rows p) !! row) (size p) row) [0..size p - 1] 
+renderCells p = mapM_ (\row -> renderRow (rows p !! row) (size p) row) [0..size p - 1] 
 
 
 renderRow :: [Square] -> Int -> Int -> IO ()
 renderRow squares size row = mapM_ (\col -> renderCell (squares !! col) size row col) [0..size - 1]
 
 
-renderCell :: Square -> Int -> Int -> Int -> IO() 
-renderCell square size row col 
-    | isEmpty $ square = return ()
-    | square == Blocked = renderBlocked size row col 
-    | otherwise = return ()
+renderCell :: Square -> Int -> Int -> Int -> IO ()
+renderCell Empty _ _ _ = return()
+renderCell Blocked size row col = renderBlocked size row col
+renderCell (Entry n) size row col = renderEntry n size row col
+renderCell (Clue c) size row col = renderClue c size row col
+    
 
 renderBlocked :: Int -> Int -> Int -> IO ()
 renderBlocked size row col = do 
@@ -91,27 +92,67 @@ renderBlocked size row col = do
       right = fromRational $ 2*row /. size - 1 + 2 /. size 
       bottom = fromRational $ -(2*col /. size - 1 + 2 /. size) 
 
+renderEntry :: Int -> Int -> Int -> Int -> IO ()
+renderEntry entry size row col = do
+  color3f 0 0 0
+  currentRasterPosition $= vertex4 textPosition
+  renderString TimesRoman24 (show entry)
+    where 
+      textPosition = centerText (cellPosition size row col)
+      centerText (x, y, z) = (x + fromRational (1 /. size), y - fromRational (1 /. size), z)
 
-(/.) = (/) `on` fromIntegral
+renderClue :: (Int, Int) -> Int -> Int -> Int -> IO ()
+renderClue (v, h) size row col = do 
+  color3f 0 0 0
+  renderFromTuple Lines diagLine
+  currentRasterPosition $= vertex4 vCluePosition 
+  renderString TimesRoman24 vClue
+  currentRasterPosition $= vertex4 hCluePosition
+  renderString TimesRoman24 hClue
+  renderClueTriangle (v, h) size row col
+    where
+      diagLine = [cellPosition size row col, cellPosition size (row + 1) (col + 1)]
+      vClueTransform (x, y, z) = (x + 3 * quarterCell, y - quarterCell, z)
+      hClueTransform (x, y, z) = (x + quarterCell, y - 3*quarterCell, z)
+      vCluePosition = vClueTransform $ cellPosition size row col
+      hCluePosition = hClueTransform $ cellPosition size row col 
+      quarterCell = fromRational (2 /. size / 4)
+      getClue c = if c >= 1 then show c else ""
+      vClue = getClue v
+      hClue = getClue h
+
+renderClueTriangle :: (Int, Int) -> Int -> Int -> Int -> IO ()
+renderClueTriangle (v, h) size row col 
+  | v >= 1 && h >= 1 = return () 
+  | v >= 1 = renderFromTuple Triangles topTriangle 
+  | h >= 1 = renderFromTuple Triangles bottomTriangle
+  | otherwise = error "Neither clue entries >= 1" 
+    where
+      topTriangle = [cellPosition size row col, cellPosition size row (col + 1), cellPosition size (row + 1) (col + 1)]
+      bottomTriangle = [cellPosition size row col, cellPosition size (row + 1) col, cellPosition size (row + 1) (col + 1)]
+
+cellPosition :: Int -> Int -> Int -> (GLfloat, GLfloat, GLfloat) 
+cellPosition size row col = (fromRational $ 2*(row /. size) - 1, fromRational $ -(2*col /. size - 1), 0)
 
 renderFromTuple :: PrimitiveMode -> [(GLfloat, GLfloat, GLfloat)] -> IO ()
 renderFromTuple mode vertices = renderPrimitive mode $ mapM_ (\(x, y, z) -> vertex $ Vertex3 x y z) vertices
 
 
+renderGrid :: Int -> IO ()
+renderGrid n = do
+  color3f 0 0 0
+  renderPrimitive Lines $ mapM_ (\(x, y, z) -> vertex $ Vertex3 x y z) (gridLines n)
 
-renderGrid :: Integral a => a -> IO ()
-renderGrid n = renderPrimitive Lines $ mapM_ (\(x, y, z) -> vertex $ Vertex3 x y z) (gridLines n)
-
-gridLines :: Integral a => a -> [(GLfloat, GLfloat, GLfloat)]
+gridLines :: Int -> [(GLfloat, GLfloat, GLfloat)]
 gridLines n = horizontalLines n ++ verticalLines n
 
 
-horizontalLines :: Integral a => a -> [(GLfloat, GLfloat, GLfloat)]
+horizontalLines :: Int -> [(GLfloat, GLfloat, GLfloat)]
 horizontalLines n = interleave 
-    [(-1, 2.0 * y / (fromIntegral n) - 1, 0) | y <- map fromIntegral [0..n]] 
-    [(1, 2.0 * y / (fromIntegral n) - 1, 0) | y <- map fromIntegral [0..n]]
+    [(-1, 2.0 * y / fromIntegral n - 1, 0) | y <- map fromIntegral [0..n]] 
+    [(1, 2.0 * y / fromIntegral n - 1, 0) | y <- map fromIntegral [0..n]]
 
-verticalLines :: Integral a => a -> [(GLfloat, GLfloat, GLfloat)] 
+verticalLines :: Int -> [(GLfloat, GLfloat, GLfloat)] 
 verticalLines n = interleave 
     [(2.0*x/(fromIntegral n) - 1, -1, 0) | x <- map fromIntegral [0..n]] 
     [(2.0*x/(fromIntegral n) - 1, 1, 0) | x <- map fromIntegral [0..n]]
@@ -124,3 +165,8 @@ interleave (x:xs) (y:ys) = x:y:(interleave xs ys)
 
 
 color3f r g b = color $ Color3 r g (b :: GLfloat)
+
+(/.) = (/) `on` fromIntegral
+
+
+vertex4 (x, y, z) = Vertex4 x y z 1

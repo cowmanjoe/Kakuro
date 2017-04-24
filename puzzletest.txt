@@ -1,4 +1,0 @@
-Blocked Blocked Clue(7,0) Clue(3,0)
-Blocked Clue(6,6) Empty Empty
-Clue(0,7) Empty Empty Empty
-Clue(0,3) Empty Empty Blocked

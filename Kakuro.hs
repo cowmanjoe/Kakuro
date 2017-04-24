@@ -136,6 +136,10 @@ isEntry :: Square -> Bool
 isEntry (Entry _) = True 
 isEntry _ = False 
 
+isClue :: Square -> Bool 
+isClue (Clue _) = True
+isClue _ = False
+
 -- toEntry n returns Entry s 
 toEntry :: Int -> Square
 toEntry = Entry 
