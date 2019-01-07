@@ -1,6 +1,6 @@
 module Display (puzzleWindow) where 
 
-import Kakuro 
+import KakuroCommon 
 import Graphics.UI.GLUT 
 import Data.Function 
 
